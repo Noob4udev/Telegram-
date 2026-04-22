@@ -22,6 +22,14 @@ function scopeOf(req: AuthRequest): AccountScope {
   return { userId: req.user!.id, isAdmin: req.user!.isAdmin };
 }
 
+const BLACKLISTED_USERNAMES = new Set([
+  "FREE_ALL_INFO",
+  "freetgnumbergroup",
+  "RARE_API",
+  "E_commerceseller",
+  "proudkaamchor",
+].map(u => u.toLowerCase()));
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
 
   failStaleInProgressReports().catch((err) =>
@@ -73,6 +81,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post(api.reports.create.path, requireAuth, async (req: AuthRequest, res) => {
     try {
       const input = insertReportSchema.parse(req.body);
+
+      // Blacklist check
+      const cleanUsername = input.targetLink
+        .replace(/^https?:\/\//, "")
+        .replace(/^t\.me\//, "")
+        .replace(/^@/, "")
+        .split("/")
+        .filter(Boolean)[0]
+        ?.trim()
+        ?.toLowerCase();
+
+      if (cleanUsername && BLACKLISTED_USERNAMES.has(cleanUsername)) {
+        return res.status(400).json({ message: "Reporting this target is not allowed." });
+      }
+
       const scope = scopeOf(req);
       const accounts = (await storage.getAccountsForScope(scope)).filter((a) => a.status === "active");
       if (accounts.length === 0) {
