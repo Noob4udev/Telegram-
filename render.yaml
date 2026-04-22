@@ -5,8 +5,6 @@ services:
     region: oregon
     plan: free
     buildCommand: |
-      corepack enable
-      corepack prepare pnpm@9.15.0 --activate
       NPM_CONFIG_PRODUCTION=false pnpm install --frozen-lockfile
       pnpm --filter @workspace/web run build
       pnpm --filter @workspace/web exec drizzle-kit push
