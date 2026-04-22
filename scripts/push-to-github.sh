@@ -42,7 +42,6 @@ git config user.name  "TG Reporter Deploy"
 if command -v git-lfs >/dev/null 2>&1; then
   git lfs uninstall --local >/dev/null 2>&1 || true
 fi
-rm -f .gitattributes 2>/dev/null || true
 
 # Remove any leftover LFS pointer FILES in the working tree (broken/orphaned).
 # Anything tiny that begins with the LFS spec header is a pointer to a blob we
