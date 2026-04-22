@@ -1,0 +1,21 @@
+kind = "web"
+previewPath = "/"
+title = "Telegram Reporter"
+version = "1.0.0"
+id = "TgReporter2024xYzAbc"
+router = "path"
+
+[[services]]
+localPort = 5000
+name = "Telegram Reporter"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/web run dev"
+
+[services.production]
+run = "pnpm --filter @workspace/web run start"
+build = ["pnpm", "--filter", "@workspace/web", "run", "build"]
+
+[services.env]
+PORT = "5000"

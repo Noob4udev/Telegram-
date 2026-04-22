@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: tg-reporter
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: |
+      corepack enable
+      corepack prepare pnpm@9.15.0 --activate
+      NPM_CONFIG_PRODUCTION=false pnpm install --frozen-lockfile
+      pnpm --filter @workspace/web run build
+      pnpm --filter @workspace/web exec drizzle-kit push
+    startCommand: pnpm --filter @workspace/web run start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tg-reporter-db
+          property: connectionString
+
+databases:
+  - name: tg-reporter-db
+    region: oregon
+    plan: free
