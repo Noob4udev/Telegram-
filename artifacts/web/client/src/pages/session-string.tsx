@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronsUpDown, Check, Copy, KeyRound, Loader2, Save, ShieldCheck, RefreshCw, AlertCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +21,8 @@ const DEFAULT_COUNTRY = COUNTRIES.find((c) => c.iso2 === "US") || COUNTRIES[0];
 
 export default function SessionStringPage() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
   const [openCountry, setOpenCountry] = useState(false);
   const [phoneLocal, setPhoneLocal] = useState("");
@@ -137,11 +141,17 @@ export default function SessionStringPage() {
         sessionString,
         phoneNumber: savedPhone,
       });
+
+      // Invalidate accounts list to show the new account immediately
+      queryClient.invalidateQueries({ queryKey: [routes.accounts.list.path] });
+
       toast({
         title: "Account saved",
         description: "This session was saved and will be used by the app.",
       });
+
       reset();
+      setLocation("/"); // Navigate to accounts page
     } catch (err: any) {
       toast({
         title: "Save failed",
