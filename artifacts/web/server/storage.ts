@@ -36,22 +36,27 @@ export class DatabaseStorage {
   ): Promise<TelegramAccount> {
     const phone = account.phoneNumber ?? null;
 
-    const existing = await db.select().from(telegramAccounts).where(
-      and(
-        eq(telegramAccounts.apiId, account.apiId),
-        eq(telegramAccounts.apiHash, account.apiHash),
-        phone === null
-          ? sql`${telegramAccounts.phoneNumber} is null`
-          : eq(telegramAccounts.phoneNumber, phone),
-      )
-    ).limit(1);
+    // Only attempt to find an existing account if a phone number is provided.
+    // This allows multiple accounts with the same API credentials (but no phone number)
+    // to coexist if added manually.
+    if (phone) {
+      const [existing] = await db.select()
+        .from(telegramAccounts)
+        .where(eq(telegramAccounts.phoneNumber, phone))
+        .limit(1);
 
-    if (existing.length > 0) {
-      const [updated] = await db.update(telegramAccounts)
-        .set({ sessionString: account.sessionString, phoneNumber: phone, userId })
-        .where(eq(telegramAccounts.id, existing[0].id))
-        .returning();
-      return updated;
+      if (existing) {
+        const [updated] = await db.update(telegramAccounts)
+          .set({
+            apiId: account.apiId,
+            apiHash: account.apiHash,
+            sessionString: account.sessionString,
+            userId,
+          })
+          .where(eq(telegramAccounts.id, existing.id))
+          .returning();
+        return updated;
+      }
     }
 
     const [created] = await db.insert(telegramAccounts)
