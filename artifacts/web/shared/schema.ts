@@ -32,7 +32,7 @@ export const telegramAccounts = pgTable("telegram_accounts", {
   status: text("status").default('active'),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => ({
-  unq: uniqueIndex("api_credentials_phone_unq").on(t.apiId, t.apiHash, t.phoneNumber),
+  phoneNumberUnq: uniqueIndex("phone_number_unq").on(t.phoneNumber),
 }));
 
 export const reports = pgTable("reports", {
