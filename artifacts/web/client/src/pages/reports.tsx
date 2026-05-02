@@ -2,10 +2,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { ShieldAlert, Send, Activity, Link as LinkIcon, Hash, CheckCircle2, Clock, XCircle, Gauge, Zap } from "lucide-react";
+import { ShieldAlert, Send, Activity, Link as LinkIcon, Hash, CheckCircle2, Clock, XCircle, Gauge, Zap, Square } from "lucide-react";
 import { z } from "zod";
 
-import { useReports, useCreateReport } from "@/hooks/use-reports";
+import { useReports, useCreateReport, useStopReport } from "@/hooks/use-reports";
 import { useAccounts } from "@/hooks/use-accounts";
 import { insertReportSchema, type InsertReport } from "@shared/schema";
 
@@ -49,6 +49,7 @@ export default function ReportsPage() {
   const { data: reports, isLoading: reportsLoading } = useReports();
   const { data: accounts } = useAccounts();
   const createReport = useCreateReport();
+  const stopReport = useStopReport();
 
   // Extend schema to ensure volume is parsed to a number
   const formSchema = insertReportSchema.extend({
@@ -312,7 +313,29 @@ export default function ReportsPage() {
                             <span className="text-emerald-500" title="Successful">{report.successfulCount || 0}</span> / <span className="text-destructive" title="Failed">{report.failedCount || 0}</span>
                           </TableCell>
                           <TableCell className="text-center">
-                            {getStatusBadge(report.status)}
+                            <div className="flex items-center justify-center gap-2">
+                              {getStatusBadge(report.status)}
+                              {report.status === "in_progress" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                  onClick={() => {
+                                    if (confirm("Are you sure you want to stop this report job?")) {
+                                      stopReport.mutate(report.id);
+                                    }
+                                  }}
+                                  disabled={stopReport.isPending}
+                                  title="Stop report job"
+                                >
+                                  {stopReport.isPending && stopReport.variables === report.id ? (
+                                    <div className="h-3 w-3 border-2 border-destructive/30 border-t-destructive rounded-full animate-spin" />
+                                  ) : (
+                                    <Square className="h-3.5 w-3.5 fill-current" />
+                                  )}
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
                             {report.createdAt ? format(new Date(report.createdAt), 'MMM d, HH:mm') : 'N/A'}

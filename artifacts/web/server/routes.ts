@@ -30,6 +30,8 @@ const BLACKLISTED_USERNAMES = new Set([
   "proudkaamchor",
 ].map(u => u.toLowerCase()));
 
+const activeJobs = new Set<number>();
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
 
   failStaleInProgressReports().catch((err) =>
@@ -76,6 +78,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ----- Reports (require auth) -----
   app.get(api.reports.list.path, requireAuth, async (req: AuthRequest, res) => {
     res.json(await storage.getReportsForScope(scopeOf(req)));
+  });
+
+  app.post(api.reports.stop.path, requireAuth, async (req: AuthRequest, res) => {
+    const reportId = Number(req.params.id);
+    const report = await storage.getReport(reportId);
+    if (!report) return res.status(404).json({ message: "Report not found" });
+    if (!req.user!.isAdmin && report.userId !== req.user!.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    if (report.status === "in_progress") {
+      activeJobs.delete(reportId);
+      await storage.updateReportStatus(reportId, "failed");
+    }
+    res.json(await storage.getReport(reportId));
   });
 
   app.post(api.reports.create.path, requireAuth, async (req: AuthRequest, res) => {
@@ -310,6 +327,7 @@ async function startReportJob(
   scope: AccountScope,
 ) {
   try {
+    activeJobs.add(reportId);
     await storage.updateReportStatus(reportId, "in_progress");
 
     const allAccounts = await storage.getAccountsForScope(scope);
@@ -378,6 +396,7 @@ async function startReportJob(
       const BATCH_SIZE = 5;
       const start = successfulCount + failedCount;
       for (let batch = start; batch < totalCount; batch += BATCH_SIZE) {
+        if (!activeJobs.has(reportId)) break;
         const batchIndices = Array.from(
           { length: Math.min(BATCH_SIZE, totalCount - batch) },
           (_, k) => batch + k
@@ -392,6 +411,7 @@ async function startReportJob(
       }
     } else {
       for (let i = successfulCount + failedCount; i < totalCount; i++) {
+        if (!activeJobs.has(reportId)) break;
         try {
           const result = await runSingleReport(i);
           if (result.success) successfulCount++; else failedCount++;
@@ -406,8 +426,14 @@ async function startReportJob(
     }
 
     for (const client of Array.from(clients.values())) await client.disconnect();
-    await storage.updateReportStatus(reportId, successfulCount > 0 ? "completed" : "failed");
+
+    // If it was cancelled, status was already set to 'failed' by the /stop endpoint
+    if (activeJobs.has(reportId)) {
+      await storage.updateReportStatus(reportId, successfulCount > 0 ? "completed" : "failed");
+      activeJobs.delete(reportId);
+    }
   } catch (error: any) {
+    activeJobs.delete(reportId);
     console.error("Reporting failed completely:", error);
     await storage.updateReportStatus(reportId, "failed");
   }

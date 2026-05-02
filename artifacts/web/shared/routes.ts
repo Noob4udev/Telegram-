@@ -65,6 +65,11 @@ export const api = {
         400: errorSchemas.validation,
       },
     },
+    stop: {
+      method: 'POST' as const,
+      path: '/tg-api/reports/:id/stop' as const,
+      responses: { 200: z.custom<typeof reports.$inferSelect>() },
+    },
   },
   templates: {
     list: {
