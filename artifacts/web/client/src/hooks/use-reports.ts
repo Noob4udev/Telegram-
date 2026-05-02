@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
 import type { InsertReport } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
@@ -40,6 +40,41 @@ export function useCreateReport() {
       toast({
         title: "Report Job Started",
         description: "Your report has been queued for processing.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useStopReport() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.reports.stop.path, { id });
+      const res = await fetch(url, {
+        method: api.reports.stop.method,
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: "Failed to stop report" }));
+        throw new Error(errorData.message || "Failed to stop report");
+      }
+      return api.reports.stop.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.reports.list.path] });
+      toast({
+        title: "Report Job Stopped",
+        description: "The report job has been successfully cancelled.",
       });
     },
     onError: (error: Error) => {
