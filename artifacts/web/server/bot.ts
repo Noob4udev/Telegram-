@@ -1,9 +1,11 @@
 import { db } from "./db";
+import { storage } from "./storage";
 import { verifyTokens } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
 const BOT_USERNAME = (process.env.TELEGRAM_BOT_USERNAME || "").trim().replace(/^@/, "").trim();
+const ADMIN_TG_ID = (process.env.ADMIN_TELEGRAM_USER_ID || "").trim();
 
 const API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
@@ -84,6 +86,13 @@ async function processUpdate(update: any) {
       await handleStart(chatId, from, param);
     } else if (text.startsWith("/help")) {
       await sendMessage(chatId, "Use the <b>Verify with Telegram</b> button on the TeleGuard website to log in.");
+    } else if (text.startsWith("/cancel")) {
+      if (String(from.id) === ADMIN_TG_ID) {
+        await storage.stopAllJobs();
+        await sendMessage(chatId, "🛑 <b>All active report jobs have been stopped by Admin.</b>");
+      } else {
+        await sendMessage(chatId, "❌ You are not authorized to use this command.");
+      }
     }
   } catch (e) {
     console.error("bot processUpdate error:", e);

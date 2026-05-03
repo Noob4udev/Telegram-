@@ -30,8 +30,6 @@ const BLACKLISTED_USERNAMES = new Set([
   "proudkaamchor",
 ].map(u => u.toLowerCase()));
 
-const activeJobs = new Set<number>();
-
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
 
   failStaleInProgressReports().catch((err) =>
@@ -89,7 +87,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
 
     if (report.status === "in_progress") {
-      activeJobs.delete(reportId);
+      storage.unregisterJob(reportId);
       await storage.updateReportStatus(reportId, "failed");
     }
     res.json(await storage.getReport(reportId));
@@ -327,7 +325,7 @@ async function startReportJob(
   scope: AccountScope,
 ) {
   try {
-    activeJobs.add(reportId);
+    storage.registerJob(reportId);
     await storage.updateReportStatus(reportId, "in_progress");
 
     const allAccounts = await storage.getAccountsForScope(scope);
@@ -396,7 +394,7 @@ async function startReportJob(
       const BATCH_SIZE = 5;
       const start = successfulCount + failedCount;
       for (let batch = start; batch < totalCount; batch += BATCH_SIZE) {
-        if (!activeJobs.has(reportId)) break;
+        if (!storage.isJobActive(reportId)) break;
         const batchIndices = Array.from(
           { length: Math.min(BATCH_SIZE, totalCount - batch) },
           (_, k) => batch + k
@@ -411,7 +409,7 @@ async function startReportJob(
       }
     } else {
       for (let i = successfulCount + failedCount; i < totalCount; i++) {
-        if (!activeJobs.has(reportId)) break;
+        if (!storage.isJobActive(reportId)) break;
         try {
           const result = await runSingleReport(i);
           if (result.success) successfulCount++; else failedCount++;
@@ -428,12 +426,12 @@ async function startReportJob(
     for (const client of Array.from(clients.values())) await client.disconnect();
 
     // If it was cancelled, status was already set to 'failed' by the /stop endpoint
-    if (activeJobs.has(reportId)) {
+    if (storage.isJobActive(reportId)) {
       await storage.updateReportStatus(reportId, successfulCount > 0 ? "completed" : "failed");
-      activeJobs.delete(reportId);
+      storage.unregisterJob(reportId);
     }
   } catch (error: any) {
-    activeJobs.delete(reportId);
+    storage.unregisterJob(reportId);
     console.error("Reporting failed completely:", error);
     await storage.updateReportStatus(reportId, "failed");
   }

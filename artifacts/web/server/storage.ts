@@ -18,6 +18,28 @@ export interface AccountScope {
 }
 
 export class DatabaseStorage {
+  private activeJobs = new Set<number>();
+
+  registerJob(id: number) {
+    this.activeJobs.add(id);
+  }
+
+  unregisterJob(id: number) {
+    this.activeJobs.delete(id);
+  }
+
+  isJobActive(id: number): boolean {
+    return this.activeJobs.has(id);
+  }
+
+  async stopAllJobs() {
+    const jobs = Array.from(this.activeJobs);
+    this.activeJobs.clear();
+    for (const id of jobs) {
+      await this.updateReportStatus(id, "failed");
+    }
+  }
+
   async getAccountsForScope(scope: AccountScope): Promise<TelegramAccount[]> {
     if (scope.isAdmin) {
       return await db.select().from(telegramAccounts);
